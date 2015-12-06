@@ -1,0 +1,14 @@
+{
+    "name": "assignment_server",
+    "description": "Comps381f Assignment",
+    "author": "Tsang Chi Wai <s1098797@ouhk.edu.hk>, Lee Shing Hin <s1111597@ouhk.edu.hk>",
+    "version": "0.0.1",
+    "dependencies": {
+		"mongoose" : "*",
+		"body-parser": "*",
+		"express" : "*",
+		"ejs" : "*"
+    },
+    "engine": "node >= 0.10.0",
+    "scripts": {"start": "node assignment_server"}
+}
