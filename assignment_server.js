@@ -1,7 +1,7 @@
 var express = require('express');
 var app = express();
 var mongoose = require('mongoose');
-var MONGODBURL = 'mongodb://localhost:27017/assignment';
+var MONGODBURL = 'mongodb://davidtsang.cloudapp.net:27017/assignment';
 var bodyParser = require('body-parser');
 
 var restaurantSchema = require('./models/restaurant');
@@ -121,40 +121,6 @@ app.get('/grades/score/:field/:value', function(req,res) {   /* find document fr
 			});
 		});	
 	}
-});
-
-app.get('/address.coord/:lon/:lat',function(req,res) {   /*  find documents with address.coord --- not finish!!!!!!*/
-	mongoose.connect(MONGODBURL);
-	var db = mongoose.connection;
-	db.on('error', console.error.bind(console, 'connection error:'));
-	db.once('open', function (callback) {
-		var Restaurant = mongoose.model('Restaurant', restaurantSchema);
-		var criteria = {};
-		var coord = [];
-		coord.push(req.params.lon);
-		coord.push(req.params.lat);
-		console.log("coord: " + coord + '\n');
-		criteria[address.coord] = coord;
-		console.log("criteria: " + JSON.stringify(criteria) + '\n');
-		Restaurant.find(criteria, function(err,results) {
-			if (err) {
-				res.status(500).json(err);
-				throw err;
-			}
-			else if (results.length > 0){
-				console.log('Found: ',results);
-				for (var i=0; i<results.length; i++) {
-					console.log(JSON.stringify(results[i]) + '\n');
-					res.write(results[i] + '\n');
-				}
-				res.end();
-			}
-			else {
-				res.status(200).json({message: 'No matching document'});
-			}
-			db.close();
-		});
-	});
 });
 
 app.get('/insert/*',function(req,res) {    /* insert document by any number of criteria ---USELESS---*/
@@ -346,7 +312,7 @@ app.get('/avgscore/:field/:value',function(req,res) {
 		db.on('error', console.error.bind(console, 'connection error:'));
 		db.once('open', function (callback) {
 			var Restaurant = mongoose.model('Restaurant', restaurantSchema);
-			Restaurant.aggregate({$unwind: "$grades"}, {$group: {_id: "$name", avg: {$avg: "$grades.score"} }}, {$match: {avg: selection}}, function(err,results) {
+			Restaurant.aggregate({$unwind: "$grades"}, {$group: {_id: "$restaurant_id", avg: {$avg: "$grades.score"} }}, {$match: {avg: selection}}, function(err,results) {
 				if (err) {
 					console.log("Error: " + err.message);
 					res.write(err.message);
