@@ -1,9 +1,14 @@
 var express = require('express');
 var app = express();
 var mongoose = require('mongoose');
-var MONGODBURL = 'mongodb://davidtsang.cloudapp.net:27017/assignment';
+var MONGODBURL = 'mongodb://localhost:27017/assignment';
 var bodyParser = require('body-parser');
+
 var restaurantSchema = require('./models/restaurant');
+
+//app.use(express.static(__dirname + '/public'));
+
+//app.set('view engine', 'ejs');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -19,18 +24,20 @@ app.get('/', function(req,res) {
 app.post('/', function(req,res) {  /*  create or insert an document  */
 	var r = {};
 	r.address = {};
-	r.address.building = req.body.building;
-	r.address.street = req.body.street;
-	r.address.zipcode = req.body.zipcode;
+	if (req.body.building) r.address.building = req.body.building;
+	if (req.body.street) r.address.street = req.body.street;
+	if (req.body.zipcode) r.address.zipcode = req.body.zipcode;
+	if (req.body.lon || req.body.lat) {	
 	r.address.coord = [];
 	var rlon = parseFloat(req.body.lon);
 	var rlat = parseFloat(req.body.lat);
 	r.address.coord.push(rlon);
 	r.address.coord.push(rlat);
-	r.borough = req.body.borough;
-	r.cuisine = req.body.cuisine;
-	r.name = req.body.name;
-	r.restaurant_id = req.body.restaurant_id;
+	}
+	if (req.body.borough) r.borough = req.body.borough;
+	if (req.body.cuisine) r.cuisine = req.body.cuisine;
+	if (req.body.name) r.name = req.body.name;
+	if (req.body.restaurant_id) r.restaurant_id = req.body.restaurant_id;
 
 	mongoose.connect(MONGODBURL);
 	var db = mongoose.connection;
@@ -116,6 +123,40 @@ app.get('/grades/score/:field/:value', function(req,res) {   /* find document fr
 	}
 });
 
+app.get('/address.coord/:lon/:lat',function(req,res) {   /*  find documents with address.coord --- not finish!!!!!!*/
+	mongoose.connect(MONGODBURL);
+	var db = mongoose.connection;
+	db.on('error', console.error.bind(console, 'connection error:'));
+	db.once('open', function (callback) {
+		var Restaurant = mongoose.model('Restaurant', restaurantSchema);
+		var criteria = {};
+		var coord = [];
+		coord.push(req.params.lon);
+		coord.push(req.params.lat);
+		console.log("coord: " + coord + '\n');
+		criteria[address.coord] = coord;
+		console.log("criteria: " + JSON.stringify(criteria) + '\n');
+		Restaurant.find(criteria, function(err,results) {
+			if (err) {
+				res.status(500).json(err);
+				throw err;
+			}
+			else if (results.length > 0){
+				console.log('Found: ',results);
+				for (var i=0; i<results.length; i++) {
+					console.log(JSON.stringify(results[i]) + '\n');
+					res.write(results[i] + '\n');
+				}
+				res.end();
+			}
+			else {
+				res.status(200).json({message: 'No matching document'});
+			}
+			db.close();
+		});
+	});
+});
+
 app.get('/insert/*',function(req,res) {    /* insert document by any number of criteria ---USELESS---*/
 	var path = req.path;
 	path = req.path.slice(8,req.path.length);
@@ -142,6 +183,7 @@ app.get('/insert/*',function(req,res) {    /* insert document by any number of c
 			else
 				criteria[string[i]] = string[i+1];
 		}
+		console.log(JSON.stringify(criteria)+'\n');
 		mongoose.connect(MONGODBURL);
 		var db = mongoose.connection;
 		db.on('error', console.error.bind(console, 'connection error:'));
@@ -166,6 +208,7 @@ app.get('/insert/*',function(req,res) {    /* insert document by any number of c
 
 app.get('/or/*', function(req,res) {   /* find document by or  */
 	var path = req.path.slice(4,req.path.length);
+	console.log(""+path+'\n');
 	var string_array = path.split("/");
 	var string = [];
 	var count = 0;
@@ -196,6 +239,7 @@ app.get('/or/*', function(req,res) {   /* find document by or  */
 				criteria[string[i]] = string[i+1];
 			selection.push(criteria);
 		}
+		console.log("sel"+JSON.stringify(selection));
 		mongoose.connect(MONGODBURL);
 		var db = mongoose.connection;
 		db.on('error', console.error.bind(console, 'connection error:'));
@@ -252,6 +296,7 @@ app.get('/find/*',function(req,res) {    /* retrieve document by any number of c
 				criteria[string[i]] = string[i+1];
 			selection.push(criteria);
 		}
+		console.log("sel"+JSON.stringify(selection));
 		mongoose.connect(MONGODBURL);
 		var db = mongoose.connection;
 		db.on('error', console.error.bind(console, 'connection error:'));
@@ -278,6 +323,46 @@ app.get('/find/*',function(req,res) {    /* retrieve document by any number of c
 		});
 	}
 });
+
+
+app.get('/avgscore/:field/:value',function(req,res) {    
+	var selection;
+	if (isNaN(req.params.value)) 
+		res.end("The input is not a number.", 200);
+	else {
+		
+		if (req.params.field=="gt")
+			selection = { $gt: parseFloat(req.params.value) };
+		else if (req.params.field=="gte")
+			selection = { $gte: parseFloat(req.params.value) };
+		else if (req.params.field=="lt")
+			selection = { $lt: parseFloat(req.params.value) };
+		else if (req.params.field=="lte")
+			selection = { $lte: parseFloat(req.params.value) };
+		
+		console.log("sel"+JSON.stringify(selection));
+		mongoose.connect(MONGODBURL);
+		var db = mongoose.connection;
+		db.on('error', console.error.bind(console, 'connection error:'));
+		db.once('open', function (callback) {
+			var Restaurant = mongoose.model('Restaurant', restaurantSchema);
+			Restaurant.aggregate({$unwind: "$grades"}, {$group: {_id: "$name", avg: {$avg: "$grades.score"} }}, {$match: {avg: selection}}, function(err,results) {
+				if (err) {
+					console.log("Error: " + err.message);
+					res.write(err.message);
+				}
+				else if (results.length > 0){
+					res.status(200).json(results);
+					db.close();
+				}
+				else {
+					res.status(200).json({message: 'No matching document'});
+				}
+			});
+		});
+	}
+});
+
 
 app.put('/grades/*', function(req,res) {   /* push an grades object with any criteria */
 	var path = req.path;
@@ -424,6 +509,7 @@ app.put('/*', function(req,res) {   /* update document with more than one criter
 			else
 				criteria[string_item[0]] = string_item[1];
 		}	
+		console.log("cri: "+JSON.stringify(criteria));
 		mongoose.connect(MONGODBURL);
 		var db = mongoose.connection;
 		db.on('error', console.error.bind(console, 'connection error:'));
